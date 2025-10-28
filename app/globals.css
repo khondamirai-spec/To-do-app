@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+/* App theme tokens approximating the screenshot */
+@theme {
+  --color-bg: #f2f2f2;
+  --color-card: #ffffff;
+  --color-muted: #8c8c8f;
+  --color-primary: #6b6cf6; /* violet-ish */
+  --color-primary-500: #6b6cf6;
+  --color-primary-600: #5758e6;
+  --color-accent: #111111;
+  --radius-xl: 24px;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+}
+
+html, body, :root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: #0f0f12;
+}
+
+.card {
+  @apply rounded-[var(--radius-xl)] bg-[--color-card] shadow-sm;
+  box-shadow: 0 1px 0 rgba(15, 15, 18, 0.04), 0 10px 20px rgba(15, 15, 18, 0.04);
+}
+
+.soft-border {
+  border: 1px solid rgba(15,15,18,0.06);
+}
+
+.chip {
+  @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium;
+  border: 1px solid rgba(15,15,18,0.06);
+}
+
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-[10px] px-3.5 py-2 text-sm font-medium select-none;
+  border: 1px solid rgba(15,15,18,0.06);
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+}
+
+.btn-ghost {
+  @apply bg-white hover:bg-zinc-50;
+}
+
+.sidebar-section-title {
+  @apply text-[11px] uppercase tracking-[0.12em] text-[--color-muted] font-semibold;
+}
+
+.divider {
+  @apply h-px bg-zinc-200/70 my-4 rounded-full;
+}
+
+/* Scrollbars subtle */
+*::-webkit-scrollbar { height: 10px; width: 10px; }
+*::-webkit-scrollbar-thumb { background: rgba(0,0,0,.08); border-radius: 999px; }
+*::-webkit-scrollbar-track { background: transparent; }
