@@ -26,6 +26,11 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       )
     }
+    
+    console.log('[AI Route] Authenticated user:', {
+      id: user.id,
+      email: user.email,
+    })
 
     // 2. Get OpenAI API key from environment
     const openaiApiKey = process.env.OPENAI_API_KEY
@@ -50,16 +55,46 @@ export async function POST(request: NextRequest) {
 
     // 4. Fetch user's tasks from Supabase
     const supabase = await createServerClient()
+
+    // Verify the Supabase client is authenticated
+    const { data: { user: supabaseUser }, error: authCheckError } = await supabase.auth.getUser()
+    console.log('[AI Route] Supabase client user check:', {
+      authenticated: !!supabaseUser,
+      userId: supabaseUser?.id,
+      matchesRequestUser: supabaseUser?.id === user.id,
+      error: authCheckError?.message
+    })
+
+    if (!supabaseUser || supabaseUser.id !== user.id) {
+      console.error('[AI Route] Authentication mismatch! User not properly authenticated in Supabase client')
+      return NextResponse.json(
+        { error: 'Authentication error. Please try logging out and back in.' },
+        { status: 401 }
+      )
+    }
+
+    console.log(`[AI Route] Fetching tasks for user: ${user.id}`)
+
+    // Fetch tasks - RLS will automatically filter by authenticated user
+    // We don't need .eq('user_id', user.id) because RLS handles this
     const { data: tasks, error: tasksError } = await supabase
       .from('tasks')
-      .select('id, title, description, priority, date, due_date, completed, created_at')
-      .eq('user_id', user.id)
+      .select('id, title, description, priority, date, completed, created_at')
+      .eq('completed', false)
       .order('created_at', { ascending: false })
       .limit(50) // Limit to most recent 50 tasks for context
 
     if (tasksError) {
-      console.error('Error fetching tasks:', tasksError)
+      console.error('[AI Route] Error fetching tasks:', tasksError)
+      console.error('[AI Route] Error details:', JSON.stringify(tasksError, null, 2))
       // Continue without tasks if there's an error (don't fail the request)
+    } else {
+      console.log(`[AI Route] Successfully fetched ${tasks?.length || 0} tasks`)
+      if (tasks && tasks.length > 0) {
+        console.log('[AI Route] Sample tasks:', tasks.slice(0, 3).map(t => ({ id: t.id, title: t.title })))
+      } else {
+        console.log('[AI Route] No tasks returned from database query')
+      }
     }
 
     // 5. Format tasks for the prompt
@@ -67,7 +102,7 @@ export async function POST(request: NextRequest) {
       ? tasks.map((task, idx) => {
           const status = task.completed ? '✅ Completed' : '⏳ Pending'
           const priority = task.priority ? `Priority: ${task.priority}` : ''
-          const date = task.date ? `Due: ${task.date}` : task.due_date ? `Due: ${task.due_date}` : ''
+          const date = task.date ? `Due: ${task.date}` : ''
           const desc = task.description ? `\n  Description: ${task.description}` : ''
           return `${idx + 1}. ${task.title} (${status})${priority ? ` - ${priority}` : ''}${date ? ` - ${date}` : ''}${desc}`
         }).join('\n')
@@ -87,6 +122,9 @@ ${tasksText}
 Help the user with questions about their tasks, provide suggestions for task management, 
 prioritization advice, or answer general questions. Be concise, friendly, and actionable.
 If the user asks about specific tasks, refer to them by their number or title.`
+
+    console.log('[AI Route] System prompt:', systemPrompt)
+    console.log('[AI Route] User message:', message.trim())
 
     // 8. Call OpenAI API
     // Note: Using gpt-4o as gpt-5 doesn't exist yet. Update when available.
@@ -130,4 +168,6 @@ export async function GET() {
     { status: 405 }
   )
 }
+
+
 
