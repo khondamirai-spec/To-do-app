@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
 
 /**
  * Message type for chat
@@ -14,15 +13,9 @@ type Message = {
 }
 
 /**
- * AI Chat Component
+ * Chat Component
  * 
- * A right-side panel chat interface that allows users to:
- * - Send messages to the AI assistant
- * - View conversation history
- * - See loading states while AI responds
- * 
- * Security: The API key is never exposed to the client.
- * All API calls go through /api/ai which handles authentication.
+ * A right-side panel chat interface UI
  */
 export function AIChat({ onClose }: { onClose: () => void }) {
   const [messages, setMessages] = useState<Message[]>([])
@@ -42,145 +35,18 @@ export function AIChat({ onClose }: { onClose: () => void }) {
   }, [])
 
   /**
-   * Sends a message to the AI API
-   */
-  const sendMessage = async () => {
-    const messageText = input.trim()
-    if (!messageText || isLoading) return
-
-    // Add user message to chat
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: messageText,
-      timestamp: new Date(),
-    }
-    setMessages((prev) => [...prev, userMessage])
-    setInput('')
-    setIsLoading(true)
-
-    try {
-      // Get the current session to send auth token
-      const { data: { session } } = await supabase.auth.getSession()
-
-      if (!session) {
-        throw new Error('Not authenticated. Please log in.')
-      }
-
-      // Call the API route
-      const response = await fetch('/api/ai', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ message: messageText }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-        throw new Error(errorData.error || `API error: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      // Add AI response to chat
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'ai',
-        content: data.reply || 'Sorry, I could not generate a response.',
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, aiMessage])
-    } catch (error) {
-      console.error('Error sending message:', error)
-      
-      // Add error message to chat
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'ai',
-        content: `Error: ${error instanceof Error ? error.message : 'Failed to get response. Please try again.'}`,
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, errorMessage])
-    } finally {
-      setIsLoading(false)
-      // Refocus input after sending
-      setTimeout(() => inputRef.current?.focus(), 100)
-    }
-  }
-
-  /**
    * Handles form submission
    */
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    sendMessage()
+    // Functionality removed - UI only
   }
 
   /**
    * Handles quick suggestion clicks
    */
-  const handleSuggestionClick = async (suggestion: string) => {
-    // Add user message to chat
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: suggestion,
-      timestamp: new Date(),
-    }
-    setMessages((prev) => [...prev, userMessage])
-    setIsLoading(true)
-
-    try {
-      // Get the current session to send auth token
-      const { data: { session } } = await supabase.auth.getSession()
-
-      if (!session) {
-        throw new Error('Not authenticated. Please log in.')
-      }
-
-      // Call the API route
-      const response = await fetch('/api/ai', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ message: suggestion }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-        throw new Error(errorData.error || `API error: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      // Add AI response to chat
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'ai',
-        content: data.reply || 'Sorry, I could not generate a response.',
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, aiMessage])
-    } catch (error) {
-      console.error('Error sending message:', error)
-      
-      // Add error message to chat
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'ai',
-        content: `Error: ${error instanceof Error ? error.message : 'Failed to get response. Please try again.'}`,
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, errorMessage])
-    } finally {
-      setIsLoading(false)
-      // Refocus input after sending
-      setTimeout(() => inputRef.current?.focus(), 100)
-    }
+  const handleSuggestionClick = (suggestion: string) => {
+    // Functionality removed - UI only
   }
 
   return (

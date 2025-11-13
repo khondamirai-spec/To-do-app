@@ -4,9 +4,6 @@ import { useMemo, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { getTasks, createTask, updateTask, deleteTask as deleteTaskFromDB, getCompletedTasks, type Task as DBTask, type Priority } from '@/lib/tasks';
-import { supabase } from '@/lib/supabase';
-import { getSession, signOut, getUser } from '@/lib/auth';
-import { getProfile, hasProfile } from '@/lib/profile';
 import { getAvatarById } from '@/lib/avatars';
 import { AIChat } from '@/components/ai-chat';
 
@@ -301,8 +298,8 @@ function Sidebar({ activeMenu, setActiveMenu, onSignOut, profileName, userEmail,
 
         <div className="mt-4 flex items-center justify-between gap-3 px-2">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="size-10 rounded-full bg-white border-2 border-gray-200 grid place-items-center shrink-0 overflow-hidden" draggable="false">
-              {getAvatarById(avatarId || 1)}
+            <div className="size-10 rounded-full bg-white border-2 border-gray-200 grid place-items-center shrink-0 overflow-hidden text-2xl" draggable="false">
+              👤
             </div>
             <div className="text-sm leading-tight min-w-0 flex-1">
               <div className="font-medium truncate">{profileName || 'User'}</div>
@@ -765,8 +762,7 @@ export default function AppPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<string>('');
-  const [checkingAuth, setCheckingAuth] = useState(true);
-  const [userName, setUserName] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>('User');
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userAvatarId, setUserAvatarId] = useState<number>(1);
   const router = useRouter();
@@ -774,46 +770,9 @@ export default function AppPage() {
   const todayStr = toLocalISODate();
   const todayTasks = useMemo(() => tasks.filter(t => t.date === todayStr), [tasks, todayStr]);
 
-  // Check authentication on mount and load user profile
+  // Load tasks on mount
   useEffect(() => {
-    const checkAuth = async () => {
-      const session = await getSession();
-      if (!session) {
-        router.push('/auth/login');
-      } else {
-        // Check if user has a profile, redirect if not
-        try {
-          const profileExists = await hasProfile();
-          if (!profileExists) {
-            router.push('/auth/setup-profile');
-            return;
-          }
-          
-          setCheckingAuth(false);
-          // Load user profile to get name, email, and avatar
-          try {
-            const profile = await getProfile();
-            if (profile) {
-              setUserName(profile.full_name);
-              setUserAvatarId(profile.avatar_id || 1);
-            }
-            // Get user email from session
-            const user = await getUser();
-            if (user?.email) {
-              setUserEmail(user.email);
-            }
-          } catch (error) {
-            console.error('Failed to load user profile:', error);
-            // Continue without name if profile can't be loaded
-          }
-        } catch (error) {
-          // If profile check fails, redirect to setup-profile as fallback
-          console.error('Error checking profile:', error);
-          router.push('/auth/setup-profile');
-        }
-      }
-    };
-    checkAuth();
+    // No auth check needed
   }, [router]);
 
   // Function to load tasks from database
@@ -840,50 +799,10 @@ export default function AppPage() {
     }
   };
 
-  // Load tasks from Supabase on mount and set up real-time subscription
+  // Load tasks on mount
   useEffect(() => {
-    if (checkingAuth) return;
-
     loadTasks();
-
-    // Set up real-time subscription to listen for database changes
-    try {
-      console.log('Setting up Supabase Realtime subscription...');
-
-      const channel = supabase
-        .channel('tasks-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
-            schema: 'public',
-            table: 'tasks'
-          },
-          (payload: any) => {
-            console.log('Real-time change detected:', payload);
-
-            // Reload tasks whenever any change occurs in the database
-            loadTasks();
-          }
-        )
-        .subscribe((status: string) => {
-          console.log('Subscription status:', status);
-        });
-
-      // Cleanup subscription on unmount
-      return () => {
-        console.log('Cleaning up Supabase subscription...');
-        try {
-          supabase.removeChannel(channel);
-        } catch (error) {
-          console.error('Error cleaning up subscription:', error);
-        }
-      };
-    } catch (error) {
-      console.error('Failed to set up Supabase subscription:', error);
-      // Don't prevent page from loading if subscription fails
-    }
-  }, [checkingAuth]);
+  }, []);
 
   async function toggleTask(id: string) {
     const task = tasks.find(t => t.id === id);
@@ -1031,23 +950,9 @@ export default function AppPage() {
     setShowHistory(false);
   }
 
-  async function handleSignOut() {
-    try {
-      await signOut();
-      router.push('/auth/login');
-      router.refresh();
-    } catch (error) {
-      console.error('Failed to sign out:', error);
-      alert('Failed to sign out. Please try again.');
-    }
-  }
-
-  if (checkingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-600">Checking authentication...</div>
-      </div>
-    );
+  function handleSignOut() {
+    // No-op: auth removed
+    console.log('Sign out clicked (auth removed)');
   }
 
   return (
