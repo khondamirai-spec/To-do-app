@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { getTasks, createTask, updateTask, deleteTask as deleteTaskFromDB, getCompletedTasks, type Task as DBTask, type Priority } from '@/lib/tasks';
 import { getAvatarById } from '@/lib/avatars';
 import { AIChat } from '@/components/ai-chat';
+import { supabase } from '@/lib/supabase';
+import { getUserProfile, hasProfileSetup } from '@/lib/profile';
 
 // Custom Date Picker Component
 function CustomDatePicker({ value, onChange, placeholder = "Select date" }: {
@@ -298,8 +300,14 @@ function Sidebar({ activeMenu, setActiveMenu, onSignOut, profileName, userEmail,
 
         <div className="mt-4 flex items-center justify-between gap-3 px-2">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="size-10 rounded-full bg-white border-2 border-gray-200 grid place-items-center shrink-0 overflow-hidden text-2xl" draggable="false">
-              👤
+            <div className="size-10 rounded-full bg-white border-2 border-gray-200 grid place-items-center shrink-0 overflow-hidden" draggable="false">
+              {avatarId ? (
+                <div className="w-full h-full flex items-center justify-center">
+                  {getAvatarById(avatarId)}
+                </div>
+              ) : (
+                <span className="text-2xl">👤</span>
+              )}
             </div>
             <div className="text-sm leading-tight min-w-0 flex-1">
               <div className="font-medium truncate">{profileName || 'User'}</div>
@@ -374,7 +382,7 @@ function TopCard({ connectionStatus, userName }: { connectionStatus: string; use
         </div>
       </div>
       <div className="mt-4 pt-3 border-t border-gray-100">
-        <div className="text-sm text-gray-600">This page can only be seen by logged-in users.</div>
+        <div className="text-sm text-gray-600">Bu sahifani faqat tizimga kirgan foydalanuvchilar ko'ra oladi.</div>
       </div>
     </div>
   );
@@ -770,9 +778,36 @@ export default function AppPage() {
   const todayStr = toLocalISODate();
   const todayTasks = useMemo(() => tasks.filter(t => t.date === todayStr), [tasks, todayStr]);
 
-  // Load tasks on mount
+  // Load user data on mount
   useEffect(() => {
-    // No auth check needed
+    const loadUser = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          router.push('/auth/login');
+          return;
+        }
+
+        // Check if user has completed profile setup
+        const hasProfile = await hasProfileSetup();
+        if (!hasProfile) {
+          router.push('/auth/setup-profile');
+          return;
+        }
+
+        setUserEmail(user.email || null);
+        setUserName(user.email?.split('@')[0] || 'User');
+        
+        // Load user profile to get avatar_id
+        const profile = await getUserProfile();
+        if (profile && profile.avatar_id) {
+          setUserAvatarId(profile.avatar_id);
+        }
+      } catch (error) {
+        console.error('Failed to load user:', error);
+      }
+    };
+    loadUser();
   }, [router]);
 
   // Function to load tasks from database
@@ -950,9 +985,47 @@ export default function AppPage() {
     setShowHistory(false);
   }
 
-  function handleSignOut() {
-    // No-op: auth removed
-    console.log('Sign out clicked (auth removed)');
+  async function handleSignOut() {
+    try {
+      // Sign out from all sessions
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
+      
+      if (error) {
+        console.error('Sign out error:', error);
+        // Even if there's an error, try to clear session manually
+        if (typeof window !== 'undefined') {
+          // Clear Supabase session from localStorage
+          const keys = Object.keys(localStorage);
+          keys.forEach(key => {
+            if (key.startsWith('sb-')) {
+              localStorage.removeItem(key);
+            }
+          });
+        }
+      }
+      
+      // Clear any local state
+      setUserName(null);
+      setUserEmail(null);
+      
+      // Force full page reload to clear all state and redirect
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth/login';
+      }
+    } catch (error) {
+      console.error('Sign out error:', error);
+      // Even if there's an error, try to redirect
+      if (typeof window !== 'undefined') {
+        // Clear Supabase session from localStorage
+        const keys = Object.keys(localStorage);
+        keys.forEach(key => {
+          if (key.startsWith('sb-')) {
+            localStorage.removeItem(key);
+          }
+        });
+        window.location.href = '/auth/login';
+      }
+    }
   }
 
   return (
@@ -988,7 +1061,7 @@ export default function AppPage() {
             currentView={activeMenu} 
           />
         ) : (
-          <AIChat onClose={() => {}} />
+          <AIChat onClose={() => {}} tasks={tasks} />
         )}
       </div>
     </main>

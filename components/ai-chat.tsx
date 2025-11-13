@@ -13,11 +13,30 @@ type Message = {
 }
 
 /**
+ * Task type for AI context
+ */
+type Task = {
+  id: string
+  title: string
+  description?: string | null
+  priority?: string
+  badge?: string
+  date: string
+  completed?: boolean
+}
+
+/**
  * Chat Component
  * 
- * A right-side panel chat interface UI
+ * A right-side panel chat interface UI with OpenAI integration
  */
-export function AIChat({ onClose }: { onClose: () => void }) {
+export function AIChat({ 
+  onClose, 
+  tasks = [] 
+}: { 
+  onClose: () => void
+  tasks?: Task[]
+}) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -37,16 +56,77 @@ export function AIChat({ onClose }: { onClose: () => void }) {
   /**
    * Handles form submission
    */
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Functionality removed - UI only
+    
+    if (!input.trim() || isLoading) return
+
+    const userMessage = input.trim()
+    setInput('')
+    
+    // Add user message to chat
+    const userMsg: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: userMessage,
+      timestamp: new Date(),
+    }
+    setMessages(prev => [...prev, userMsg])
+    setIsLoading(true)
+
+    try {
+      // Call AI API
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: userMessage,
+          tasks: tasks,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      
+      // Add AI response to chat
+      const aiMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'ai',
+        content: data.response || 'Kechirasiz, javob olishda xatolik yuz berdi.',
+        timestamp: new Date(),
+      }
+      setMessages(prev => [...prev, aiMsg])
+    } catch (error) {
+      console.error('Failed to get AI response:', error)
+      const errorMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'ai',
+        content: 'Kechirasiz, xatolik yuz berdi. Iltimos, qayta urinib ko\'ring.',
+        timestamp: new Date(),
+      }
+      setMessages(prev => [...prev, errorMsg])
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   /**
    * Handles quick suggestion clicks
    */
   const handleSuggestionClick = (suggestion: string) => {
-    // Functionality removed - UI only
+    setInput(suggestion)
+    // Auto-submit after a short delay
+    setTimeout(() => {
+      const form = inputRef.current?.form
+      if (form) {
+        form.requestSubmit()
+      }
+    }, 100)
   }
 
   return (
@@ -73,12 +153,13 @@ export function AIChat({ onClose }: { onClose: () => void }) {
         {messages.length === 0 ? (
           <div className="card soft-border p-6 text-center">
             <div className="space-y-6">
-              <div className="text-sm text-[--color-muted]">Hi! How can I help you?</div>
+              <div className="text-sm text-[--color-muted]">Salom! Sizga qanday yordam bera olaman?</div>
               <div className="space-y-3">
                 {[
-                  'What tasks do I have today?',
-                  'Help me prioritize my tasks',
-                  'What should I focus on first?',
+                  'Bugungi vazifalarim nima?',
+                  'Vazifalarimni prioritetlashga yordam bering',
+                  'Birinchi qaysi vazifani bajarish kerak?',
+                  'Vazifalarimni qisqa umumlashtiring',
                 ].map((suggestion) => (
                   <button
                     key={suggestion}
@@ -161,7 +242,7 @@ export function AIChat({ onClose }: { onClose: () => void }) {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask me anything..."
+          placeholder="Savol yuboring..."
           disabled={isLoading}
           className="flex-1 soft-border rounded-xl bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
         />
